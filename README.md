@@ -1,41 +1,29 @@
-# Introduction
+# nortek_nucleus_ros_interface
 
-```
-TODO: Write a simple description / introduction to the repository
-```
+ROS 2 interface node for the Nortek Nucleus sensor. Wraps `nortek_nucleus_driver` and publishes sensor data as standard ROS messages. Each publisher can be enabled/disabled via parameters.
 
-# Setup
+## Published Topics
 
-```
-TODO: Write a setup guide
-```
+| Topic | Type | Description |
+|---|---|---|
+| `imu/data_raw` | `sensor_msgs/Imu` | Accelerometer + gyroscope (no orientation) |
+| `imu/data` | `sensor_msgs/Imu` | AHRS orientation quaternion |
+| `imu/mag` | `sensor_msgs/MagneticField` | Magnetometer (Tesla) |
+| `nucleus/dvl` | `geometry_msgs/TwistWithCovarianceStamped` | Bottom track velocity + uncertainty |
+| `nucleus/pressure` | `sensor_msgs/FluidPressure` | Pressure (Pascal) |
 
-## Using pre-commit
+## Build
 
-This project uses [pre-commit](https://github.com/pre-commit/pre-commit) to manage automated checks.
+Requires `nortek_nucleus_driver` to be installed (`sudo make install` from its build directory).
 
-### Install pre-commit
 ```bash
-pip install pre-commit
+colcon build --packages-select nortek_nucleus_ros_interface --symlink-install
 ```
 
-### Run all hooks manually
+## Launch
+
 ```bash
-pre-commit run --all-files
+ros2 launch nortek_nucleus_ros_interface nortek_nucleus_ros_interface.launch.py
 ```
 
-### Install the git hook
-This will make the checks run automatically every time you `git commit`:
-```bash
-pre-commit install
-```
-
-### Update pre-commit hooks
-```bash
-pre-commit autoupdate
-```
-
-## GitHub Actions CI
-- This project uses GitHub Actions for CI.
-- Workflows are located in [`.github/workflows`](.github/workflows/).
-- For more information, see [vortex-ci](https://github.com/vortexntnu/vortex-ci).
+Configuration in `config/nortek_nucleus_ros_interface_params.yaml`.
