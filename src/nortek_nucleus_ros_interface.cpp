@@ -25,12 +25,16 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
     enable_dvl_ = declare_parameter<bool>("enable_dvl");
     enable_pressure_ = declare_parameter<bool>("enable_pressure");
     enable_magnetometer_ = declare_parameter<bool>("enable_magnetometer");
+    enable_ins_twist_ = declare_parameter<bool>("enable_ins_twist");
+    enable_ins_position_ = declare_parameter<bool>("enable_ins_position");
 
     declare_parameter<std::string>("imu_data_raw_pub_topic");
     declare_parameter<std::string>("imu_data_pub_topic");
     declare_parameter<std::string>("dvl_pub_topic");
     declare_parameter<std::string>("pressure_pub_topic");
     declare_parameter<std::string>("magnetometer_pub_topic");
+    declare_parameter<std::string>("ins_twist_pub_topic");
+    declare_parameter<std::string>("ins_position_pub_topic");
 
     declare_parameter<int>("imu_settings.freq");
 
@@ -72,6 +76,17 @@ void NortekNucleusRosInterface::create_publishers() {
     if (enable_magnetometer_) {
         magnetometer_pub_ = create_publisher<sensor_msgs::msg::MagneticField>(
             get_parameter("magnetometer_pub_topic").as_string(), qos);
+    }
+
+    if (enable_ins_twist_) {
+        ins_twist_pub_ =
+            create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
+                get_parameter("ins_twist_pub_topic").as_string(), qos);
+    }
+
+    if (enable_ins_position_) {
+        ins_position_pub_ = create_publisher<geometry_msgs::msg::PointStamped>(
+            get_parameter("ins_position_pub_topic").as_string(), qos);
     }
 }
 
@@ -214,6 +229,8 @@ void NortekNucleusRosInterface::nucleus_callback(NortekNucleusFrame frame) {
                 handle_pressure(data);
             } else if constexpr (std::is_same_v<T, MagnetoMeterData>) {
                 handle_magnetometer(data);
+            } else if constexpr (std::is_same_v<T, InsDataV2>) {
+                handle_ins(data);
             }
         },
         frame);
@@ -311,6 +328,41 @@ void NortekNucleusRosInterface::handle_magnetometer(
     msg->magnetic_field.z = static_cast<double>(data.magnetometer_z) * 1e-6;
 
     magnetometer_pub_->publish(std::move(msg));
+}
+
+void NortekNucleusRosInterface::handle_ins(const InsDataV2& data) {
+    if (enable_ins_twist_) {
+        auto twist_msg =
+            std::make_unique<geometry_msgs::msg::TwistWithCovarianceStamped>();
+        twist_msg->header.frame_id = frame_id_;
+        twist_msg->header.stamp = this->get_clock()->now();
+
+        twist_msg->twist.twist.linear.x = data.velocity_body_x;
+        twist_msg->twist.twist.linear.y = data.velocity_body_x;
+        twist_msg->twist.twist.linear.z = data.velocity_body_x;
+
+        twist_msg->twist.twist.angular.x = data.turn_rate_x;
+        twist_msg->twist.twist.angular.y = data.turn_rate_y;
+        twist_msg->twist.twist.angular.z = data.turn_rate_z;
+
+        // No covariance information available, set to unknown
+        twist_msg->twist.covariance[0] = -1.0;
+
+        ins_twist_pub_->publish(std::move(twist_msg));
+    }
+
+    if (enable_ins_position_) {
+        auto position_msg =
+            std::make_unique<geometry_msgs::msg::PointStamped>();
+        position_msg->header.frame_id = frame_id_;
+        position_msg->header.stamp = this->get_clock()->now();
+
+        position_msg->point.x = data.position_ned_x;
+        position_msg->point.y = data.position_ned_y;
+        position_msg->point.z = data.position_ned_z;
+
+        ins_position_pub_->publish(std::move(position_msg));
+    }
 }
 
 RCLCPP_COMPONENTS_REGISTER_NODE(NortekNucleusRosInterface)

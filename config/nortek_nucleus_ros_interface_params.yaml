@@ -12,6 +12,8 @@
     enable_dvl: true
     enable_pressure: true
     enable_magnetometer: true
+    enable_ins_twist: true
+    enable_ins_position: true
 
     # Topic names
     imu_data_raw_pub_topic: imu/data_raw
@@ -19,6 +21,8 @@
     dvl_pub_topic: nucleus/dvl
     pressure_pub_topic: nucleus/pressure
     magnetometer_pub_topic: imu/mag
+    ins_twist_pub_topic: nucleus/ins/twist
+    ins_position_pub_topic: nucleus/ins/position
 
     # IMU settings
     imu_settings:

@@ -1,6 +1,7 @@
 #ifndef NORTEK_NUCLEUS_ROS_INTERFACE__NORTEK_NUCLEUS_ROS_INTERFACE_HPP_
 #define NORTEK_NUCLEUS_ROS_INTERFACE__NORTEK_NUCLEUS_ROS_INTERFACE_HPP_
 
+#include <geometry_msgs/msg/point_stamped.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <memory>
 #include <nortek_nucleus_driver.hpp>
@@ -33,6 +34,7 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     void handle_bottom_track(const BottomTrackData& data);
     void handle_pressure(const FastPressureData& data);
     void handle_magnetometer(const MagnetoMeterData& data);
+    void handle_ins(const InsDataV2& data);
 
     void declare_ros_parameters();
     void create_publishers();
@@ -54,12 +56,18 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
     rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr
         magnetometer_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr
+        ins_twist_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr
+        ins_position_pub_;
 
     // Enable flags
     bool enable_imu_{};
     bool enable_dvl_{};
     bool enable_pressure_{};
     bool enable_magnetometer_{};
+    bool enable_ins_twist_{};
+    bool enable_ins_position_{};
 
     std::string frame_id_;
 };
