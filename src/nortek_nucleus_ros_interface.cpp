@@ -10,6 +10,7 @@ NortekNucleusRosInterface::NortekNucleusRosInterface(
     create_publishers();
     create_driver();
     setup_connection();
+    configure_instrument_settings();
     configure_nucleus();
     start_nucleus_stream();
 }
@@ -50,6 +51,10 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
 
     declare_parameter<int>("magnetometer_settings.freq");
     declare_parameter<int>("magnetometer_settings.mode");
+
+    declare_parameter<double>("instrument_settings.rotxy", 0.0);
+    declare_parameter<double>("instrument_settings.rotyz", 0.0);
+    declare_parameter<double>("instrument_settings.rotxz", 0.0);
 }
 
 void NortekNucleusRosInterface::create_publishers() {
@@ -121,6 +126,24 @@ void NortekNucleusRosInterface::setup_connection() {
     }
 
     RCLCPP_INFO(get_logger(), "Nucleus TCP connection opened.");
+}
+
+void NortekNucleusRosInterface::configure_instrument_settings() {
+    InstrumentSettings inst;
+    inst.rotxy = get_parameter("instrument_settings.rotxy").as_double();
+    inst.rotyz = get_parameter("instrument_settings.rotyz").as_double();
+    inst.rotxz = get_parameter("instrument_settings.rotxz").as_double();
+
+    auto sc = nucleus_driver_->set_instrument_settings(inst);
+    if (sc != NucleusStatusCode::Ok) {
+        RCLCPP_ERROR(get_logger(),
+                     "Failed to set instrument alignment settings (SETINST)");
+    } else {
+        RCLCPP_INFO(
+            get_logger(),
+            "Instrument alignment set: ROTXY=%.2f ROTYZ=%.2f ROTXZ=%.2f (deg)",
+            inst.rotxy, inst.rotyz, inst.rotxz);
+    }
 }
 
 void NortekNucleusRosInterface::configure_nucleus() {

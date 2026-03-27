@@ -40,6 +40,7 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     void create_publishers();
     void create_driver();
     void setup_connection();
+    void configure_instrument_settings();
     void configure_nucleus();
     void start_nucleus_stream();
 

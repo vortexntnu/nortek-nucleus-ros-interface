@@ -48,3 +48,11 @@
     magnetometer_settings:
       freq: 75             # Hz
       mode: 0              # 0=Auto, 1=Off, 2=Wmm
+
+    # Instrument mounting alignment (SETINST) — rotation from VEHICLE to Nucleus [deg, -180..180]
+    # ROTXY = yaw offset (rotation about z-axis). Use 180.0 if instrument is mounted 180° flipped in yaw.
+    # Settings are written to device and saved persistently (SAVE,CONFIG) on each startup.
+    instrument_settings:
+      rotxy: 180.0   # yaw/heading alignment offset
+      rotyz: 0.0     # roll alignment offset
+      rotxz: 0.0     # pitch alignment offset
