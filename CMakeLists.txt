@@ -13,6 +13,7 @@ find_package(ament_cmake REQUIRED)
 find_package(nortek_nucleus_driver CONFIG REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
@@ -38,6 +39,7 @@ target_include_directories(${LIB_NAME} PUBLIC
 ament_target_dependencies(${LIB_NAME} PUBLIC
   rclcpp
   rclcpp_components
+  nav_msgs
   sensor_msgs
   geometry_msgs
 )

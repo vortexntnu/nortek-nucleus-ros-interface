@@ -2,8 +2,11 @@
 #define NORTEK_NUCLEUS_ROS_INTERFACE__NORTEK_NUCLEUS_ROS_INTERFACE_HPP_
 
 #include <geometry_msgs/msg/point_stamped.hpp>
+#include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
 #include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
 #include <memory>
+#include <nav_msgs/msg/odometry.hpp>
 #include <nortek_nucleus_driver.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/fluid_pressure.hpp>
@@ -31,10 +34,10 @@ class NortekNucleusRosInterface : public rclcpp::Node {
 
     void handle_imu(const ImuData& data);
     void handle_ahrs(const AhrsDataV2& data);
+    void handle_ins(const InsDataV2& data);
     void handle_bottom_track(const BottomTrackData& data);
     void handle_pressure(const FastPressureData& data);
     void handle_magnetometer(const MagnetoMeterData& data);
-    void handle_ins(const InsDataV2& data);
 
     void declare_ros_parameters();
     void create_publishers();
@@ -49,9 +52,9 @@ class NortekNucleusRosInterface : public rclcpp::Node {
 
     std::unique_ptr<NortekNucleusDriver> nucleus_driver_;
 
-    // Publishers — only created when enabled via parameters
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_data_raw_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_data_pub_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr ins_odom_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr
         dvl_pub_;
     rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
@@ -61,14 +64,21 @@ class NortekNucleusRosInterface : public rclcpp::Node {
         ins_twist_pub_;
     rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr
         ins_position_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr
+        ins_pose_pub_;
 
-    // Enable flags
     bool enable_imu_{};
+    bool enable_ins_odom_{};
     bool enable_dvl_{};
     bool enable_pressure_{};
     bool enable_magnetometer_{};
     bool enable_ins_twist_{};
     bool enable_ins_position_{};
+    bool enable_ins_pose_{};
+
+    // Cached AHRS orientation for use in INS odometry
+    geometry_msgs::msg::Quaternion latest_ahrs_orientation_;
+    bool ahrs_received_{false};
 
     std::string frame_id_;
 };
