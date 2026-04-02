@@ -11,6 +11,7 @@
     enable_imu: true
     enable_ins_odom: true
     enable_dvl: true
+    enable_altimeter: true
     enable_pressure: true
     enable_magnetometer: true
     enable_ins_twist: true
@@ -22,6 +23,7 @@
     imu_data_pub_topic: imu/data
     ins_pub_topic: nucleus/odom
     dvl_pub_topic: nucleus/dvl
+    altimeter_pub_topic: nucleus/altitude
     pressure_pub_topic: nucleus/pressure
     magnetometer_pub_topic: imu/mag
     ins_twist_pub_topic: nucleus/ins/twist
@@ -43,10 +45,9 @@
       velocity_range: 5    # m/s
       enable_watertrack: false
 
-    # Fast pressure settings
-    fast_pressure_settings:
-      enable: true
-      sampling_rate: 16    # Hz
+    # Altimeter settings (also sources pressure data)
+    altimeter_settings:
+      power_level: 0       # 0=default
 
     # Magnetometer settings
     magnetometer_settings:

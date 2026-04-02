@@ -26,6 +26,7 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
     enable_ins_odom_ = declare_parameter<bool>("enable_ins_odom");
     enable_dvl_ = declare_parameter<bool>("enable_dvl");
     enable_pressure_ = declare_parameter<bool>("enable_pressure");
+    enable_altimeter_ = declare_parameter<bool>("enable_altimeter");
     enable_magnetometer_ = declare_parameter<bool>("enable_magnetometer");
     enable_ins_twist_ = declare_parameter<bool>("enable_ins_twist");
     enable_ins_position_ = declare_parameter<bool>("enable_ins_position");
@@ -36,6 +37,7 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
     declare_parameter<std::string>("ins_pub_topic");
     declare_parameter<std::string>("dvl_pub_topic");
     declare_parameter<std::string>("pressure_pub_topic");
+    declare_parameter<std::string>("altimeter_pub_topic");
     declare_parameter<std::string>("magnetometer_pub_topic");
     declare_parameter<std::string>("ins_twist_pub_topic");
     declare_parameter<std::string>("ins_position_pub_topic");
@@ -50,8 +52,7 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
     declare_parameter<int>("bottom_track_settings.velocity_range");
     declare_parameter<bool>("bottom_track_settings.enable_watertrack");
 
-    declare_parameter<bool>("fast_pressure_settings.enable");
-    declare_parameter<int>("fast_pressure_settings.sampling_rate");
+    declare_parameter<int>("altimeter_settings.power_level", 0);
 
     declare_parameter<int>("magnetometer_settings.freq");
     declare_parameter<int>("magnetometer_settings.mode");
@@ -80,6 +81,11 @@ void NortekNucleusRosInterface::create_publishers() {
         dvl_pub_ =
             create_publisher<geometry_msgs::msg::TwistWithCovarianceStamped>(
                 get_parameter("dvl_pub_topic").as_string(), qos);
+    }
+
+    if (enable_altimeter_) {
+        altimeter_pub_ = create_publisher<vortex_msgs::msg::DVLAltitude>(
+            get_parameter("altimeter_pub_topic").as_string(), qos);
     }
 
     if (enable_pressure_) {
@@ -207,18 +213,16 @@ void NortekNucleusRosInterface::configure_nucleus() {
         }
     }
 
-    if (enable_pressure_) {
-        FastPressureSettings fp_settings;
-        fp_settings.enable_fast_pressure =
-            get_parameter("fast_pressure_settings.enable").as_bool();
-        fp_settings.sampling_rate = static_cast<int>(
-            get_parameter("fast_pressure_settings.sampling_rate").as_int());
-        fp_settings.data_stream_settings = NucleusDataStreamSettings::On;
-        fp_settings.data_format = NucleusDataFormats::FastPressureFormat;
+    if (enable_altimeter_ || enable_pressure_) {
+        AltimeterSettings alt_settings;
+        alt_settings.power_level = static_cast<int>(
+            get_parameter("altimeter_settings.power_level").as_int());
+        alt_settings.data_stream_settings = NucleusDataStreamSettings::On;
+        alt_settings.data_format = NucleusDataFormats::AltimeterFormat;
 
-        auto sc = nucleus_driver_->set_fast_pressure_settings(fp_settings);
+        auto sc = nucleus_driver_->set_altimeter_settings(alt_settings);
         if (sc != NucleusStatusCode::Ok) {
-            RCLCPP_ERROR(get_logger(), "Failed to configure fast pressure");
+            RCLCPP_ERROR(get_logger(), "Failed to configure altimeter");
         }
     }
 
@@ -265,8 +269,8 @@ void NortekNucleusRosInterface::nucleus_callback(NortekNucleusFrame frame) {
                 handle_ins(data);
             } else if constexpr (std::is_same_v<T, BottomTrackData>) {
                 handle_bottom_track(data);
-            } else if constexpr (std::is_same_v<T, FastPressureData>) {
-                handle_pressure(data);
+            } else if constexpr (std::is_same_v<T, AltimeterData>) {
+                handle_altimeter(data);
             } else if constexpr (std::is_same_v<T, MagnetoMeterData>) {
                 handle_magnetometer(data);
             }
@@ -423,18 +427,25 @@ void NortekNucleusRosInterface::handle_bottom_track(
     dvl_pub_->publish(std::move(msg));
 }
 
-void NortekNucleusRosInterface::handle_pressure(const FastPressureData& data) {
-    if (!pressure_pub_)
-        return;
+void NortekNucleusRosInterface::handle_altimeter(const AltimeterData& data) {
+    auto stamp = this->get_clock()->now();
 
-    auto msg = std::make_unique<sensor_msgs::msg::FluidPressure>();
-    msg->header.frame_id = frame_id_;
-    msg->header.stamp = this->get_clock()->now();
+    if (altimeter_pub_) {
+        auto msg = std::make_unique<vortex_msgs::msg::DVLAltitude>();
+        msg->header.frame_id = frame_id_;
+        msg->header.stamp = stamp;
+        msg->altitude = static_cast<double>(data.distance);
+        altimeter_pub_->publish(std::move(msg));
+    }
 
-    // Convert dBar to Pascal (1 dBar = 10000 Pa)
-    msg->fluid_pressure = static_cast<double>(data.fast_pressure) * 10000.0;
-
-    pressure_pub_->publish(std::move(msg));
+    if (pressure_pub_) {
+        auto msg = std::make_unique<sensor_msgs::msg::FluidPressure>();
+        msg->header.frame_id = frame_id_;
+        msg->header.stamp = stamp;
+        // Convert dBar to Pascal (1 dBar = 10000 Pa)
+        msg->fluid_pressure = static_cast<double>(data.pressure) * 10000.0;
+        pressure_pub_->publish(std::move(msg));
+    }
 }
 
 void NortekNucleusRosInterface::handle_magnetometer(

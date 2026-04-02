@@ -14,6 +14,7 @@
 #include <sensor_msgs/msg/magnetic_field.hpp>
 #include <string>
 #include <thread>
+#include <vortex_msgs/msg/dvl_altitude.hpp>
 
 namespace nortek_nucleus::ros_interface {
 
@@ -36,7 +37,7 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     void handle_ahrs(const AhrsDataV2& data);
     void handle_ins(const InsDataV2& data);
     void handle_bottom_track(const BottomTrackData& data);
-    void handle_pressure(const FastPressureData& data);
+    void handle_altimeter(const AltimeterData& data);
     void handle_magnetometer(const MagnetoMeterData& data);
 
     void declare_ros_parameters();
@@ -58,6 +59,7 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr
         dvl_pub_;
     rclcpp::Publisher<sensor_msgs::msg::FluidPressure>::SharedPtr pressure_pub_;
+    rclcpp::Publisher<vortex_msgs::msg::DVLAltitude>::SharedPtr altimeter_pub_;
     rclcpp::Publisher<sensor_msgs::msg::MagneticField>::SharedPtr
         magnetometer_pub_;
     rclcpp::Publisher<geometry_msgs::msg::TwistWithCovarianceStamped>::SharedPtr
@@ -71,6 +73,7 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     bool enable_ins_odom_{};
     bool enable_dvl_{};
     bool enable_pressure_{};
+    bool enable_altimeter_{};
     bool enable_magnetometer_{};
     bool enable_ins_twist_{};
     bool enable_ins_position_{};
