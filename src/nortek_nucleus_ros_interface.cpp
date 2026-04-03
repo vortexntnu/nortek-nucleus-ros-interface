@@ -3,6 +3,20 @@
 
 namespace nortek_nucleus::ros_interface {
 
+// Returns q_origin_conj * q_current (i.e. orientation relative to origin)
+static geometry_msgs::msg::Quaternion quaternion_relative(
+    const geometry_msgs::msg::Quaternion& origin,
+    const geometry_msgs::msg::Quaternion& current) {
+    // Conjugate of origin (inverse for unit quaternion)
+    const double cw = origin.w, cx = -origin.x, cy = -origin.y, cz = -origin.z;
+    geometry_msgs::msg::Quaternion result;
+    result.w = cw * current.w - cx * current.x - cy * current.y - cz * current.z;
+    result.x = cw * current.x + cx * current.w + cy * current.z - cz * current.y;
+    result.y = cw * current.y - cx * current.z + cy * current.w + cz * current.x;
+    result.z = cw * current.z + cx * current.y - cy * current.x + cz * current.w;
+    return result;
+}
+
 NortekNucleusRosInterface::NortekNucleusRosInterface(
     const rclcpp::NodeOptions& options)
     : Node("nortek_nucleus_ros_interface", options) {
@@ -60,6 +74,8 @@ void NortekNucleusRosInterface::declare_ros_parameters() {
     declare_parameter<double>("instrument_settings.rotxy", 0.0);
     declare_parameter<double>("instrument_settings.rotyz", 0.0);
     declare_parameter<double>("instrument_settings.rotxz", 0.0);
+
+    reset_pose_on_start_ = declare_parameter<bool>("reset_pose_on_start", false);
 }
 
 void NortekNucleusRosInterface::create_publishers() {
@@ -308,6 +324,12 @@ void NortekNucleusRosInterface::handle_ahrs(const AhrsDataV2& data) {
     latest_ahrs_orientation_.z = data.data_quaternion_z;
     ahrs_received_ = true;
 
+    if (reset_pose_on_start_ && !ahrs_origin_set_) {
+        ahrs_origin_orientation_ = latest_ahrs_orientation_;
+        ahrs_origin_set_ = true;
+        RCLCPP_INFO(get_logger(), "AHRS origin captured for pose reset.");
+    }
+
     if (!imu_data_pub_)
         return;
 
@@ -315,7 +337,12 @@ void NortekNucleusRosInterface::handle_ahrs(const AhrsDataV2& data) {
     msg->header.frame_id = frame_id_;
     msg->header.stamp = this->get_clock()->now();
 
-    msg->orientation = latest_ahrs_orientation_;
+    if (reset_pose_on_start_ && ahrs_origin_set_) {
+        msg->orientation =
+            quaternion_relative(ahrs_origin_orientation_, latest_ahrs_orientation_);
+    } else {
+        msg->orientation = latest_ahrs_orientation_;
+    }
 
     imu_data_pub_->publish(std::move(msg));
 }
@@ -323,18 +350,36 @@ void NortekNucleusRosInterface::handle_ahrs(const AhrsDataV2& data) {
 void NortekNucleusRosInterface::handle_ins(const InsDataV2& data) {
     auto stamp = this->get_clock()->now();
 
+    if (reset_pose_on_start_ && !ins_origin_set_) {
+        ins_origin_x_ = data.position_ned_x;
+        ins_origin_y_ = data.position_ned_y;
+        ins_origin_z_ = data.position_ned_z;
+        ins_origin_set_ = true;
+        RCLCPP_INFO(get_logger(), "INS origin captured for pose reset.");
+    }
+
+    const double pos_x = data.position_ned_x - (ins_origin_set_ ? ins_origin_x_ : 0.0);
+    const double pos_y = data.position_ned_y - (ins_origin_set_ ? ins_origin_y_ : 0.0);
+    const double pos_z = data.position_ned_z - (ins_origin_set_ ? ins_origin_z_ : 0.0);
+
+    const bool apply_orientation_reset = reset_pose_on_start_ && ahrs_origin_set_;
+
     if (ins_odom_pub_) {
         auto msg = std::make_unique<nav_msgs::msg::Odometry>();
         msg->header.frame_id = frame_id_ + "_odom";
         msg->header.stamp = stamp;
         msg->child_frame_id = frame_id_;
 
-        msg->pose.pose.position.x = data.position_ned_x;
-        msg->pose.pose.position.y = data.position_ned_y;
-        msg->pose.pose.position.z = data.position_ned_z;
+        msg->pose.pose.position.x = pos_x;
+        msg->pose.pose.position.y = pos_y;
+        msg->pose.pose.position.z = pos_z;
 
         if (ahrs_received_) {
-            msg->pose.pose.orientation = latest_ahrs_orientation_;
+            msg->pose.pose.orientation =
+                apply_orientation_reset
+                    ? quaternion_relative(ahrs_origin_orientation_,
+                                         latest_ahrs_orientation_)
+                    : latest_ahrs_orientation_;
         } else {
             msg->pose.pose.orientation.w = 1.0;
         }
@@ -343,9 +388,9 @@ void NortekNucleusRosInterface::handle_ins(const InsDataV2& data) {
         msg->twist.twist.linear.y = data.velocity_body_y;
         msg->twist.twist.linear.z = data.velocity_body_z;
 
-        msg->twist.twist.angular.x = data.turn_rate_x;
-        msg->twist.twist.angular.y = data.turn_rate_y;
-        msg->twist.twist.angular.z = data.turn_rate_z;
+        msg->twist.twist.angular.x = data.turn_rate_x * M_PI / 180.0;
+        msg->twist.twist.angular.y = data.turn_rate_y * M_PI / 180.0;
+        msg->twist.twist.angular.z = data.turn_rate_z * M_PI / 180.0;
 
         ins_odom_pub_->publish(std::move(msg));
     }
@@ -375,9 +420,9 @@ void NortekNucleusRosInterface::handle_ins(const InsDataV2& data) {
         position_msg->header.frame_id = frame_id_ + "_odom";
         position_msg->header.stamp = stamp;
 
-        position_msg->point.x = data.position_ned_x;
-        position_msg->point.y = data.position_ned_y;
-        position_msg->point.z = data.position_ned_z;
+        position_msg->point.x = pos_x;
+        position_msg->point.y = pos_y;
+        position_msg->point.z = pos_z;
 
         ins_position_pub_->publish(std::move(position_msg));
     }
@@ -388,12 +433,16 @@ void NortekNucleusRosInterface::handle_ins(const InsDataV2& data) {
         pose_msg->header.frame_id = frame_id_ + "_odom";
         pose_msg->header.stamp = stamp;
 
-        pose_msg->pose.pose.position.x = data.position_ned_x;
-        pose_msg->pose.pose.position.y = data.position_ned_y;
-        pose_msg->pose.pose.position.z = data.position_ned_z;
+        pose_msg->pose.pose.position.x = pos_x;
+        pose_msg->pose.pose.position.y = pos_y;
+        pose_msg->pose.pose.position.z = pos_z;
 
         if (ahrs_received_) {
-            pose_msg->pose.pose.orientation = latest_ahrs_orientation_;
+            pose_msg->pose.pose.orientation =
+                apply_orientation_reset
+                    ? quaternion_relative(ahrs_origin_orientation_,
+                                         latest_ahrs_orientation_)
+                    : latest_ahrs_orientation_;
         } else {
             pose_msg->pose.pose.orientation.w = 1.0;
         }

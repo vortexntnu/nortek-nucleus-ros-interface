@@ -83,6 +83,15 @@ class NortekNucleusRosInterface : public rclcpp::Node {
     geometry_msgs::msg::Quaternion latest_ahrs_orientation_;
     bool ahrs_received_{false};
 
+    // Pose reset on start
+    bool reset_pose_on_start_{false};
+    bool ahrs_origin_set_{false};
+    bool ins_origin_set_{false};
+    geometry_msgs::msg::Quaternion ahrs_origin_orientation_;
+    double ins_origin_x_{0.0};
+    double ins_origin_y_{0.0};
+    double ins_origin_z_{0.0};
+
     std::string frame_id_;
 };
 

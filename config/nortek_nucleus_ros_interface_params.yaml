@@ -7,6 +7,9 @@
       data_remote_port: 9000
       password: ""
 
+    # Reset position and orientation to identity on first received packet
+    reset_pose_on_start: true
+
     # Enable/disable publishers
     enable_imu: true
     enable_ins_odom: true
