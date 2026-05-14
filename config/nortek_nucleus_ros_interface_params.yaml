@@ -1,6 +1,7 @@
 /**:
   ros__parameters:
     frame_id: nucleus_frame
+    qos: best_effort # QoS for all publishers (best_effort or reliable)
 
     connection_params:
       remote_ip: "10.0.0.42"
